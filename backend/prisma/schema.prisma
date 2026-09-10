@@ -1,0 +1,133 @@
+// Prisma Schema for Vision2System
+// Supports MySQL / Relational databases as specified in Section 2 & 25
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id              String           @id @default(uuid())
+  name            String
+  email           String           @unique
+  password        String
+  role            Role             @default(USER)
+  plan            String           @default("pro")
+  credits         Int              @default(100)
+  projects        Project[]        @relation("ProjectOwner")
+  projectVersions ProjectVersion[] @relation("VersionCreator")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([email])
+}
+
+model Project {
+  id                    String                  @id @default(uuid())
+  name                  String
+  description           String                  @db.Text
+  targetUsers           String?                 @db.Text
+  expectedScale         String?
+  preferredPlatform     String?
+  preferredTech         Json?
+  ownerId               String
+  owner                 User                    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  currentVersion        Int                     @default(1)
+  status                String                  @default("active")
+  isDemo                Boolean                 @default(false)
+  scores                Json?
+  latestBlueprint       Json?                   @db.Json
+  versions              ProjectVersion[]
+  architectures         GeneratedArchitecture[]
+  databases             GeneratedDatabase[]
+  apis                  GeneratedAPI[]
+  roadmaps              GeneratedRoadmap[]
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  @@index([ownerId])
+  @@index([createdAt])
+}
+
+model ProjectVersion {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  blueprint     Json     @db.Json
+  diff          Json?    @db.Json
+  changelog     String?  @db.Text
+  createdById   String
+  createdBy     User     @relation("VersionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([projectId, versionNumber])
+  @@index([projectId])
+}
+
+model GeneratedArchitecture {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionNumber Int      @default(1)
+  nodes         Json     @db.Json
+  edges         Json     @db.Json
+  layers        Json?
+  review        Json?    @db.Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+model GeneratedDatabase {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionNumber Int      @default(1)
+  databaseType  String   @default("Relational (PostgreSQL / MySQL)")
+  tables        Json     @db.Json
+  relationships Json?    @db.Json
+  indexes       Json?    @db.Json
+  constraints   Json?    @db.Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+model GeneratedAPI {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionNumber Int      @default(1)
+  baseUrl       String   @default("/api/v1")
+  authStrategy  String   @default("Bearer JWT")
+  endpoints     Json     @db.Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+model GeneratedRoadmap {
+  id                  String   @id @default(uuid())
+  projectId           String
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionNumber       Int      @default(1)
+  totalEstimatedWeeks String   @default("8-10 weeks")
+  phases              Json     @db.Json
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([projectId])
+}

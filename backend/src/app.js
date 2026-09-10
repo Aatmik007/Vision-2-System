@@ -2,41 +2,30 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
-import aiRoutes from './routes/aiRoutes.js';
-import versionRoutes from './routes/versionRoutes.js';
-import extraRoutes from './routes/extraRoutes.js';
-import exportRoutes from './routes/exportRoutes.js';
+import { errorHandler } from './middleware/errorMiddleware.js';
 
 const app = express();
 
-// Middlewares
+// Enable CORS
 app.use(cors({
-  origin: '*', // In production, replace with specific origins
+  origin: true,
   credentials: true
 }));
+
+// Body parser middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// REST API Bindings
+// REST API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/version', versionRoutes);
-app.use('/api/collaboration', extraRoutes); // binds comments/invites
-app.use('/api/export', exportRoutes);
 
-// Base Check route
+// Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ success: true, status: 'Healthy', version: '1.0.0' });
+  res.json({ status: 'ok', service: 'Vision2System API', time: new Date() });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("Unhandled Error:", err.stack);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error'
-  });
-});
+// Centralized error handling
+app.use(errorHandler);
 
 export default app;

@@ -1,146 +1,183 @@
-import React, { useState, useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext.jsx';
-import { Layers, Mail, Lock, User, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { GoogleLogin } from '@react-oauth/google';
+import { UserPlus, User, Mail, Lock, AlertCircle } from 'lucide-react';
 
-export default function Register({ setPage }) {
-  const { register } = useContext(AuthContext);
+const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [localError, setLocalError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const { register, googleLogin } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setLocalError('');
+
+    if (!name || !email || !password || !confirmPassword) {
+      setLocalError('Please fill in all fields.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setLocalError('Passwords do not match.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setLocalError('Password must be at least 6 characters long.');
+      return;
+    }
 
     try {
-      const result = await register(name, email, password);
-      if (result.success) {
-        setPage('dashboard');
-      } else {
-        setError(result.message || 'Registration failed');
-      }
+      setSubmitting(true);
+      await register(name, email, password);
+      navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to register. Email may be taken.');
+      setLocalError(err.message || 'Registration failed.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLocalError('');
+    try {
+      setSubmitting(true);
+      await googleLogin({ credential: credentialResponse.credential });
+      navigate('/dashboard');
+    } catch (err) {
+      setLocalError(err.message || 'Google registration failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setLocalError('Google Sign Up was cancelled or failed.');
+  };
+
   return (
-    <div className="min-h-screen grid-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] aurora-glow-purple -translate-y-1/2 pointer-events-none"></div>
-
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="flex justify-center items-center gap-3 mb-6 cursor-pointer" onClick={() => setPage('landing')}>
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-accent-purple to-accent-cyan flex items-center justify-center shadow-glow-purple">
-            <Layers className="w-5 h-5 text-white" />
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-950 flex items-center justify-center px-4 py-12">
+      <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-lg p-8 shadow-lg">
+        
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 bg-indigo-950 text-indigo-400 rounded-lg flex items-center justify-center mx-auto mb-3 border border-indigo-900">
+            <UserPlus className="w-6 h-6" />
           </div>
-          <span className="font-extrabold text-xl tracking-tight text-white">Vision2System AI</span>
+          <h2 className="text-2xl font-bold text-slate-100">Create an Account</h2>
+          <p className="text-xs text-slate-400 mt-1">Start organizing your UI designs into full-stack plans</p>
         </div>
-        <h2 className="text-center text-3xl font-extrabold text-white">Create your account</h2>
-        <p className="mt-2 text-center text-sm text-slate-400">
-          Or{' '}
-          <span 
-            onClick={() => setPage('login')} 
-            className="font-medium text-accent-purple hover:text-accent-cyan cursor-pointer transition-colors"
+
+        {localError && (
+          <div className="mb-6 bg-rose-950/60 border border-rose-800/80 text-rose-300 p-3 rounded-md text-xs flex items-start space-x-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{localError}</span>
+          </div>
+        )}
+
+        {/* Google OAuth Section */}
+        <div className="mb-6 flex justify-center">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            theme="filled_black"
+            shape="pill"
+            text="signup_with"
+          />
+        </div>
+
+        <div className="relative flex py-2 items-center mb-6">
+          <div className="flex-grow border-t border-slate-800"></div>
+          <span className="flex-shrink mx-4 text-xs text-slate-500 uppercase tracking-wider">or register with email</span>
+          <div className="flex-grow border-t border-slate-800"></div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Full Name</label>
+            <div className="relative">
+              <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Alex Turner"
+                className="w-full bg-slate-950 border border-slate-800 rounded-md py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="developer@example.com"
+                className="w-full bg-slate-950 border border-slate-800 rounded-md py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Password</label>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-slate-950 border border-slate-800 rounded-md py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Confirm Password</label>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-slate-950 border border-slate-800 rounded-md py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-md transition shadow-sm"
           >
-            log in to your existing account
-          </span>
+            {submitting ? 'Creating account...' : 'Create Account'}
+          </button>
+        </form>
+
+        <p className="text-center text-xs text-slate-400 mt-6">
+          Already have an account?{' '}
+          <Link to="/login" className="text-indigo-400 font-medium hover:underline">
+            Sign in here
+          </Link>
         </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="glass py-8 px-4 shadow sm:rounded-2xl sm:px-10 border border-white/10">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {error && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-slate-300">
-                Full Name
-              </label>
-              <div className="mt-1.5 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <User className="h-4 w-4" />
-                </div>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-purple focus:border-transparent text-sm transition-all"
-                  placeholder="Alex Mercer"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-300">
-                Email address
-              </label>
-              <div className="mt-1.5 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Mail className="h-4 w-4" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-purple focus:border-transparent text-sm transition-all"
-                  placeholder="name@company.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-300">
-                Password
-              </label>
-              <div className="mt-1.5 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Lock className="h-4 w-4" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-purple focus:border-transparent text-sm transition-all"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <div className="text-xs text-slate-400">
-              By registering, you agree to our Terms of Service and receive 50 free system generation credits.
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-accent-purple hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-purple disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-glow-purple"
-              >
-                {loading ? 'Creating account...' : 'Create Account'}
-              </button>
-            </div>
-          </form>
-        </div>
       </div>
     </div>
   );
-}
+};
+
+export default Register;
