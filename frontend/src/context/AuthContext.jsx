@@ -13,7 +13,8 @@ export const AuthProvider = ({ children }) => {
     const fetchUser = async () => {
       if (token) {
         try {
-          const res = await API.get('/auth/me');
+          // Verify endpoint matches backend (e.g., /users/me)
+          const res = await API.get('/users/me');
           setUser(res.data);
         } catch (err) {
           console.error('Session validation error:', err);
@@ -36,7 +37,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password) => {
     setError(null);
     try {
-      const res = await API.post('/auth/register', { name, email, password });
+      const res = await API.post('/users/register', { name, email, password });
       saveAuthSession(res.data);
       return res.data;
     } catch (err) {
@@ -49,7 +50,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setError(null);
     try {
-      const res = await API.post('/auth/login', { email, password });
+      const res = await API.post('/users/login', { email, password });
       saveAuthSession(res.data);
       return res.data;
     } catch (err) {
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }) => {
   const googleLogin = async (googlePayload) => {
     setError(null);
     try {
-      const res = await API.post('/auth/google', googlePayload);
+      const res = await API.post('/users/google', googlePayload);
       saveAuthSession(res.data);
       return res.data;
     } catch (err) {
@@ -89,7 +90,7 @@ export const AuthProvider = ({ children }) => {
         register,
         login,
         googleLogin,
-        logout
+        logout,
       }}
     >
       {children}
