@@ -9,7 +9,7 @@ out/
 .next/
 .server/
 .cache/
-docs/INTERVIEW_GUIDE.md
+docs/
 
 
 # Local env configs
