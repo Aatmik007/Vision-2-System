@@ -50,26 +50,6 @@ const Login = () => {
     setLocalError('Google Sign In was cancelled or failed.');
   };
 
-  // Fallback for standard Google OAuth redirect if client ID is unavailable in react context
-  const handleFallbackGoogle = async () => {
-    const dummyEmail = prompt('Enter your Google Email address for Google OAuth sign in simulation:');
-    if (dummyEmail) {
-      try {
-        setSubmitting(true);
-        await googleLogin({
-          email: dummyEmail,
-          name: dummyEmail.split('@')[0],
-          googleId: `google_${Date.now()}`
-        });
-        navigate('/dashboard');
-      } catch (err) {
-        setLocalError(err.message || 'Google Auth simulation failed.');
-      } finally {
-        setSubmitting(false);
-      }
-    }
-  };
-
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-950 flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-lg p-8 shadow-lg">
@@ -90,22 +70,14 @@ const Login = () => {
         )}
 
         {/* Google OAuth Section */}
-        <div className="mb-6">
-          <div className="flex justify-center">
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={handleGoogleError}
-              theme="filled_black"
-              shape="pill"
-              text="continue_with"
-            />
-          </div>
-          <p className="text-center text-[10px] text-slate-500 mt-2">
-            Or test via{' '}
-            <button onClick={handleFallbackGoogle} type="button" className="text-indigo-400 hover:underline">
-              Google Account Direct Sign-In
-            </button>
-          </p>
+        <div className="mb-6 flex justify-center">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            theme="filled_black"
+            shape="pill"
+            text="continue_with"
+          />
         </div>
 
         <div className="relative flex py-2 items-center mb-6">

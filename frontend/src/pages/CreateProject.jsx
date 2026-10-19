@@ -30,7 +30,6 @@ const CreateProject = () => {
 
     try {
       setLoading(true);
-      console.log("FRONTEND PROMPT:", description.trim());
       const res = await API.post('/projects', {
         name: name.trim(),
         description: description.trim(),

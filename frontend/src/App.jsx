@@ -11,8 +11,9 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CreateProject from './pages/CreateProject';
 import ProjectDetails from './pages/ProjectDetails';
+import AiQualityDashboard from './pages/AiQualityDashboard';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '123456789-placeholder.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 export default function App() {
   return (
@@ -60,6 +61,15 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/quality-dashboard"
+                element={
+                  <ProtectedRoute>
+                    <AiQualityDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
 
               {/* Catch-all redirect */}
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -39,8 +39,15 @@ import {
   Terminal,
   Lock,
   Box,
-  FileJson
+  FileJson,
+  Download,
+  ShieldAlert
 } from 'lucide-react';
+
+import { generateArchitectureMarkdown } from '../utils/markdownGenerator';
+import ConsistencyValidationPanel from '../components/ConsistencyValidationPanel';
+import ArchitectureRepairModal from '../components/ArchitectureRepairModal';
+import ExportPreviewPanel from '../components/ExportPreviewPanel';
 
 const ProjectDetails = () => {
   const { id } = useParams();
@@ -56,11 +63,21 @@ const ProjectDetails = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState({});
 
+  // Phase 3 Consistency Validation & AI Repair State
+  const [consistencyFindings, setConsistencyFindings] = useState([]);
+  const [consistencySummary, setConsistencySummary] = useState({ total: 0, errors: 0, warnings: 0, info: 0, isConsistent: true });
+  const [isValidatingConsistency, setIsValidatingConsistency] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [repairModalOpen, setRepairModalOpen] = useState(false);
+  const [proposedRepair, setProposedRepair] = useState(null);
+  const [isApplyingRepair, setIsApplyingRepair] = useState(false);
+  const [repairSuccess, setRepairSuccess] = useState('');
+
+
   const fetchProject = async () => {
     try {
       setLoading(true);
       const res = await API.get(`/projects/${id}`);
-      console.log("FRONTEND RECEIVED RESPONSE:", res.data);
       setProject(res.data);
       setError('');
       // Expand all roadmap phases by default
@@ -71,11 +88,27 @@ const ProjectDetails = () => {
         });
         setExpandedPhases(initialExpanded);
       }
+      if (res.data?.generatedBlueprint) {
+        fetchConsistency();
+      }
     } catch (err) {
       console.error('Fetch project error:', err);
       setError(err.response?.data?.message || 'Failed to load project details.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchConsistency = async () => {
+    try {
+      setIsValidatingConsistency(true);
+      const res = await API.get(`/projects/${id}/consistency`);
+      setConsistencyFindings(res.data.findings || []);
+      setConsistencySummary(res.data.summary || { total: 0, errors: 0, warnings: 0, info: 0, isConsistent: true });
+    } catch (err) {
+      console.error('Fetch consistency error:', err);
+    } finally {
+      setIsValidatingConsistency(false);
     }
   };
 
@@ -88,7 +121,6 @@ const ProjectDetails = () => {
       setGenerating(true);
       setError('');
       const res = await API.post(`/projects/${id}/generate-blueprint`);
-      console.log("FRONTEND RECEIVED RESPONSE:", res.data);
       setProject(res.data);
       if (res.data?.generatedBlueprint?.roadmapPhases) {
         const initialExpanded = {};
@@ -97,6 +129,7 @@ const ProjectDetails = () => {
         });
         setExpandedPhases(initialExpanded);
       }
+      fetchConsistency();
     } catch (err) {
       console.error('Generate blueprint error:', err);
       setError(err.response?.data?.message || 'Failed to generate technical blueprint. Please check network connection.');
@@ -104,6 +137,39 @@ const ProjectDetails = () => {
       setGenerating(false);
     }
   };
+
+  const handleRequestRepair = async (selectedFindingIds) => {
+    try {
+      setIsRepairing(true);
+      setError('');
+      const res = await API.post(`/projects/${id}/repair-architecture`, { selectedFindingIds });
+      setProposedRepair(res.data);
+      setRepairModalOpen(true);
+    } catch (err) {
+      console.error('Request repair error:', err);
+      alert(err.response?.data?.message || 'Failed to generate architecture repair proposal.');
+    } finally {
+      setIsRepairing(false);
+    }
+  };
+
+  const handleConfirmRepair = async (proposedBlueprint) => {
+    try {
+      setIsApplyingRepair(true);
+      const res = await API.put(`/projects/${id}/apply-repair`, { proposedBlueprint });
+      setProject(res.data);
+      setRepairModalOpen(false);
+      setRepairSuccess('Proposed architecture repairs successfully verified and applied to project!');
+      setTimeout(() => setRepairSuccess(''), 6000);
+      fetchConsistency();
+    } catch (err) {
+      console.error('Apply repair error:', err);
+      alert(err.response?.data?.message || 'Failed to apply repaired architecture.');
+    } finally {
+      setIsApplyingRepair(false);
+    }
+  };
+
 
   const handleStatusChange = async (taskId, newStatus) => {
     try {
@@ -174,24 +240,36 @@ const ProjectDetails = () => {
 
   const blueprint = project.generatedBlueprint;
 
-  // 13 Production Sidebar Sections
+  // 17 Comprehensive Architecture Sidebar Sections
   const sidebarItems = [
     { id: 'overview', label: 'Overview', icon: FileText },
     { id: 'requirements', label: 'Requirements', icon: ListChecks },
     { id: 'techstack', label: 'Tech Stack', icon: Cpu },
     { id: 'architecture', label: 'Architecture', icon: Share2 },
+    {
+      id: 'consistency',
+      label: 'Consistency',
+      icon: ShieldAlert,
+      badge: consistencySummary.errors > 0
+        ? `${consistencySummary.errors} Err`
+        : (consistencySummary.warnings > 0 ? `${consistencySummary.warnings} Warn` : null)
+    },
+    { id: 'modules', label: 'Modules', icon: Box },
     { id: 'database', label: 'Database', icon: Database },
     { id: 'erdiagram', label: 'ER Diagram', icon: Network },
     { id: 'apis', label: 'APIs', icon: Server },
     { id: 'frontend', label: 'Frontend', icon: Layout },
     { id: 'folderstructure', label: 'Folder Structure', icon: FolderTree },
+    { id: 'errorhandling', label: 'Error Handling', icon: AlertCircle },
     { id: 'security', label: 'Security', icon: ShieldCheck },
     { id: 'roadmap', label: 'Roadmap', icon: Milestone },
     { id: 'testing', label: 'Testing', icon: CheckSquare },
-    { id: 'deployment', label: 'Deployment', icon: Cloud }
+    { id: 'deployment', label: 'Deployment', icon: Cloud },
+    { id: 'export', label: 'Export Architecture', icon: Download }
   ];
 
-  const activeItemObj = sidebarItems.find((s) => s.id === activeSection) || sidebarItems[0];
+  const activeItemObj = sidebarItems.find((s) => s.id === activeSection || (activeSection === 'markdown' && s.id === 'export')) || sidebarItems[0];
+
 
   // Calculate Roadmap Progress Metrics
   let totalTasks = 0;
@@ -220,6 +298,7 @@ const ProjectDetails = () => {
               onClick={() => navigate('/dashboard')}
               className="p-1.5 text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 rounded-md transition"
               title="Back to Dashboard"
+              aria-label="Back to Dashboard"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
@@ -248,6 +327,7 @@ const ProjectDetails = () => {
               onClick={handleGenerateBlueprint}
               disabled={generating}
               className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-medium px-4 py-2 rounded-md transition shadow-sm"
+              aria-label={blueprint ? 'Regenerate Technical Blueprint' : 'Generate Technical Blueprint'}
             >
               {generating ? (
                 <>
@@ -262,9 +342,23 @@ const ProjectDetails = () => {
               )}
             </button>
 
+            {blueprint && (
+              <button
+                onClick={() => setActiveSection('export')}
+                className="inline-flex items-center space-x-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-medium px-3 py-2 rounded-md transition border border-slate-800"
+                title="Preview, copy, and export validated architecture"
+                aria-label="Export Architecture"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Export</span>
+              </button>
+            )}
+
             <button
               onClick={handleDelete}
               className="inline-flex items-center space-x-1 bg-slate-900 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 text-xs font-medium px-3 py-2 rounded-md transition border border-slate-800"
+              aria-label="Delete project"
+              title="Delete project"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete</span>
@@ -301,6 +395,18 @@ const ProjectDetails = () => {
           </div>
         )}
 
+        {repairSuccess && (
+          <div className="bg-emerald-950/80 border border-emerald-800 text-emerald-300 p-4 rounded-lg text-xs flex items-center justify-between shadow-lg animate-in fade-in">
+            <div className="flex items-center space-x-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span className="font-medium">{repairSuccess}</span>
+            </div>
+            <button onClick={() => setRepairSuccess('')} className="p-1 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {blueprint && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             
@@ -331,14 +437,21 @@ const ProjectDetails = () => {
                           setActiveSection(item.id);
                           setMobileMenuOpen(false);
                         }}
-                        className={`flex items-center space-x-2 px-3 py-2 rounded-md text-xs font-medium transition ${
+                        className={`flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition ${
                           isActive
                             ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
                             : 'text-slate-400 hover:bg-slate-850 hover:text-slate-200'
                         }`}
                       >
-                        <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span className="truncate">{item.label}</span>
+                        <div className="flex items-center space-x-1.5 truncate">
+                          <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        {item.badge && (
+                          <span className="text-[9px] font-mono px-1 rounded bg-rose-500 text-white font-bold ml-1">
+                            {item.badge}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -362,18 +475,28 @@ const ProjectDetails = () => {
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-xs font-medium transition ${
                         isActive
                           ? 'bg-indigo-600 text-white font-semibold shadow-sm'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                          : 'text-slate-400 hover:bg-slate-850 hover:text-slate-200'
                       }`}
                     >
                       <div className="flex items-center space-x-2.5">
                         <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                         <span>{item.label}</span>
                       </div>
-                      <ChevronRight className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-600'}`} />
+                      <div className="flex items-center space-x-1.5">
+                        {item.badge && (
+                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                            isActive ? 'bg-white text-indigo-700' : 'bg-rose-950 text-rose-300 border border-rose-800'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                        <ChevronRight className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-600'}`} />
+                      </div>
                     </button>
                   );
                 })}
               </nav>
+
             </div>
 
             {/* Main Content Area */}
@@ -537,11 +660,32 @@ const ProjectDetails = () => {
                     </div>
                   )}
 
-                  <ArchitectureDiagram architecture={blueprint.architecture} />
+                  <ArchitectureDiagram
+                    architecture={blueprint?.architecture}
+                    blueprint={blueprint}
+                    isLoading={generating}
+                    error={error}
+                    onRetry={handleGenerateBlueprint}
+                  />
                 </div>
               )}
 
+              {/* CONSISTENCY VALIDATION SECTION */}
+              {activeSection === 'consistency' && (
+                <ConsistencyValidationPanel
+                  findings={consistencyFindings}
+                  summary={consistencySummary}
+                  onSelectFinding={() => {}}
+                  onNavigateSection={(sec) => setActiveSection(sec)}
+                  onRequestRepair={handleRequestRepair}
+                  isRepairing={isRepairing}
+                  onRefresh={fetchConsistency}
+                  isValidating={isValidatingConsistency}
+                />
+              )}
+
               {/* 5. DATABASE */}
+
               {activeSection === 'database' && (
                 <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 space-y-6">
                   <div>
@@ -1044,12 +1188,190 @@ const ProjectDetails = () => {
                 </div>
               )}
 
+              {/* MODULES SECTION */}
+              {activeSection === 'modules' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 space-y-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-100 flex items-center space-x-2">
+                      <Box className="w-5 h-5 text-indigo-400" />
+                      <span>Modular System Architecture</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      High-cohesion, loosely-coupled frontend and backend module boundaries
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(blueprint.modules || []).map((mod, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-950 border border-slate-800 hover:border-indigo-500/50 p-5 rounded-lg space-y-3 transition"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-bold text-slate-100">{mod.name}</h3>
+                          <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
+                            mod.type === 'frontend'
+                              ? 'bg-cyan-950/80 text-cyan-400 border-cyan-800'
+                              : mod.type === 'api'
+                              ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800'
+                              : 'bg-indigo-950/80 text-indigo-400 border-indigo-800'
+                          }`}>
+                            {mod.type}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          {mod.description}
+                        </p>
+
+                        {mod.responsibilities?.length > 0 && (
+                          <div className="space-y-1">
+                            <h4 className="text-[11px] font-semibold text-slate-300">Key Responsibilities:</h4>
+                            <ul className="text-xs space-y-1">
+                              {mod.responsibilities.map((resp, rIdx) => (
+                                <li key={rIdx} className="flex items-start space-x-2 text-slate-300">
+                                  <span className="text-indigo-400 text-sm leading-none">•</span>
+                                  <span>{resp}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {mod.filePaths?.length > 0 && (
+                          <div className="space-y-1 pt-2 border-t border-slate-850">
+                            <h4 className="text-[11px] font-semibold text-slate-400">Target Files:</h4>
+                            <div className="space-y-1">
+                              {mod.filePaths.map((fp, fIdx) => (
+                                <div
+                                  key={fIdx}
+                                  className="flex items-center justify-between text-[11px] font-mono bg-slate-900 px-2.5 py-1 rounded border border-slate-800 text-slate-300"
+                                >
+                                  <span className="truncate">{fp}</span>
+                                  <button
+                                    onClick={() => handleCopyCode(fp, `mod_${idx}_${fIdx}`)}
+                                    className="p-1 text-slate-500 hover:text-slate-300"
+                                    title="Copy path"
+                                  >
+                                    {copiedSection === `mod_${idx}_${fIdx}` ? (
+                                      <Check className="w-3 h-3 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ERROR HANDLING SECTION */}
+              {activeSection === 'errorhandling' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-6 space-y-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-100 flex items-center space-x-2">
+                      <AlertCircle className="w-5 h-5 text-indigo-400" />
+                      <span>Resilience & Error Handling Strategy</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Fault tolerance, retry policies, and structured HTTP error responses
+                    </p>
+                  </div>
+
+                  {blueprint.errorHandling && (
+                    <div className="space-y-6">
+                      <div className="bg-slate-950 border border-slate-800 p-4 rounded-lg space-y-2">
+                        <h3 className="text-xs font-bold text-indigo-300 uppercase">Architecture Strategy</h3>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {blueprint.errorHandling.strategy}
+                        </p>
+                      </div>
+
+                      {/* HTTP Status Codes Table */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-bold text-slate-300 uppercase">Standardized HTTP Error Specifications</h3>
+                        <div className="bg-slate-950 border border-slate-800 rounded-lg overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="border-b border-slate-800 text-slate-400 bg-slate-900/50">
+                                <th className="p-3 font-semibold w-24">Status</th>
+                                <th className="p-3 font-semibold">Trigger Scenario</th>
+                                <th className="p-3 font-semibold">Standard JSON Response</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-850">
+                              {(blueprint.errorHandling.httpCodes || []).map((codeObj, cIdx) => (
+                                <tr key={cIdx} className="hover:bg-slate-900/30">
+                                  <td className="p-3 font-mono font-bold text-rose-400">
+                                    {codeObj.code}
+                                  </td>
+                                  <td className="p-3 text-slate-300">
+                                    {codeObj.scenario}
+                                  </td>
+                                  <td className="p-3 font-mono text-[11px] text-slate-400">
+                                    {codeObj.responseFormat}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-slate-950 border border-slate-800 p-4 rounded-lg space-y-1">
+                          <h4 className="text-xs font-bold text-slate-300">Logging & Telemetry</h4>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            {blueprint.errorHandling.logging}
+                          </p>
+                        </div>
+                        <div className="bg-slate-950 border border-slate-800 p-4 rounded-lg space-y-1">
+                          <h4 className="text-xs font-bold text-slate-300">Retry & Circuit Breaker</h4>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            {blueprint.errorHandling.retries}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ARCHITECTURE EXPORT & SPECIFICATION SECTION */}
+              {(activeSection === 'export' || activeSection === 'markdown') && (
+                <ExportPreviewPanel
+                  project={project}
+                  findings={consistencyFindings}
+                  summary={consistencySummary}
+                />
+              )}
+
+
             </div>
           </div>
         )}
+
+        {/* Architecture AI Repair Modal */}
+        <ArchitectureRepairModal
+          isOpen={repairModalOpen}
+          onClose={() => setRepairModalOpen(false)}
+          originalBlueprint={project?.generatedBlueprint}
+          proposedBlueprint={proposedRepair?.proposed}
+          resolvedFindingIds={proposedRepair?.resolvedFindingIds || []}
+          initialFindings={consistencyFindings}
+          remainingFindings={proposedRepair?.remainingFindings || []}
+          onConfirm={handleConfirmRepair}
+          isApplying={isApplyingRepair}
+        />
       </div>
     </div>
   );
 };
+
 
 export default ProjectDetails;

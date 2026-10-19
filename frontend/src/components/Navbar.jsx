@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Layers, Plus, LogOut, User } from 'lucide-react';
+import { Layers, Plus, LogOut, User, Activity } from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -29,22 +29,30 @@ const Navbar = () => {
               <>
                 <Link
                   to="/dashboard"
-                  className="text-slate-300 hover:text-white text-sm font-medium px-3 py-2 rounded-md transition"
+                  className="text-slate-300 hover:text-white text-xs sm:text-sm font-medium px-2 sm:px-3 py-1.5 rounded-md transition"
                 >
                   Dashboard
                 </Link>
 
                 <Link
-                  to="/projects/new"
-                  className="inline-flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3.5 py-1.5 rounded-md transition shadow-sm"
+                  to="/quality-dashboard"
+                  className="text-slate-300 hover:text-white text-xs sm:text-sm font-medium px-2 sm:px-3 py-1.5 rounded-md transition flex items-center space-x-1"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>+ New Project</span>
+                  <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden sm:inline">AI Quality</span>
                 </Link>
 
-                <div className="h-4 w-px bg-slate-700 mx-2" />
+                <Link
+                  to="/projects/new"
+                  className="inline-flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium px-2.5 sm:px-3.5 py-1.5 rounded-md transition shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden xs:inline sm:inline">+ New Project</span>
+                </Link>
 
-                <div className="flex items-center space-x-2 text-sm text-slate-400">
+                <div className="hidden sm:block h-4 w-px bg-slate-700 mx-1 sm:mx-2" />
+
+                <div className="hidden md:flex items-center space-x-2 text-xs sm:text-sm text-slate-400">
                   <User className="w-4 h-4 text-slate-400" />
                   <span className="font-medium text-slate-200">{user.name}</span>
                 </div>
@@ -53,8 +61,9 @@ const Navbar = () => {
                   onClick={handleLogout}
                   className="text-slate-400 hover:text-rose-400 text-sm font-medium p-1.5 rounded-md transition"
                   title="Logout"
+                  aria-label="Logout"
                 >
-                  <LogOut className="w-5 h-5" />
+                  <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </>
             ) : (

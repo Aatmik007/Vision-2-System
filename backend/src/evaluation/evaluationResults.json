@@ -1,0 +1,505 @@
+{
+  "metadata": {
+    "suiteName": "Vision2System AI Architecture Quality & Evaluation Suite",
+    "version": "1.0.0",
+    "timestamp": "2026-10-19T12:26:13.536Z",
+    "durationMs": 83,
+    "environment": "development",
+    "executionMode": "Deterministic Mock & Schema Fallback"
+  },
+  "metrics": {
+    "totalPromptsTested": 8,
+    "successfulGenerations": 8,
+    "failedGenerations": 0,
+    "generationSuccessRate": 100,
+    "schemaValidationSuccessRate": 100,
+    "averageSemanticScore": 93,
+    "latency": {
+      "averageMs": 10,
+      "minMs": 1,
+      "maxMs": 54
+    },
+    "tokenUsage": {
+      "reliableUsageAvailable": false,
+      "disclaimer": "N/A - Deterministic Mock / Fallback execution (no external API cost incurred).",
+      "promptTokens": 0,
+      "candidateTokens": 0,
+      "totalTokens": 0,
+      "estimatedCostUsd": "0.000000"
+    }
+  },
+  "domainBreakdown": [
+    {
+      "domain": "Food Delivery",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avgLatencyMs": 54
+    },
+    {
+      "domain": "E-Commerce",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avgLatencyMs": 6
+    },
+    {
+      "domain": "Task Management",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avgLatencyMs": 7
+    },
+    {
+      "domain": "Booking & Healthcare",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avgLatencyMs": 5
+    },
+    {
+      "domain": "Edge Case: Input Validation",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avgLatencyMs": 1
+    },
+    {
+      "domain": "Edge Case: Malformed AI Output",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avgLatencyMs": 6
+    },
+    {
+      "domain": "Edge Case: API Rate Limit",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avgLatencyMs": 3
+    },
+    {
+      "domain": "Edge Case: API Timeout",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avgLatencyMs": 1
+    }
+  ],
+  "testResults": [
+    {
+      "testId": "eval-food-delivery",
+      "domain": "Food Delivery",
+      "name": "QuickBite On-Demand Food Delivery",
+      "description": "Food delivery platform with restaurant menus, live driver tracking, real-time order status, and checkout payments.",
+      "type": "domain_generation",
+      "latencyMs": 54,
+      "executionStatus": "PASSED",
+      "errorMessage": null,
+      "structuralValidation": {
+        "passed": true,
+        "errorCount": 0,
+        "errors": []
+      },
+      "semanticEvaluation": {
+        "semanticScore": 100,
+        "domainRelevance": "High",
+        "criteria": {
+          "entityCoverage": {
+            "score": 30,
+            "max": 30,
+            "passed": true,
+            "matched": [
+              "User",
+              "Restaurant",
+              "MenuItem",
+              "Order"
+            ],
+            "expected": [
+              "User",
+              "Restaurant",
+              "MenuItem",
+              "Order"
+            ],
+            "details": "4/4 domain entities present"
+          },
+          "endpointCoverage": {
+            "score": 25,
+            "max": 25,
+            "passed": true,
+            "matched": [
+              "/api/v1/restaurants",
+              "/api/v1/orders"
+            ],
+            "expected": [
+              "/api/v1/restaurants",
+              "/api/v1/orders"
+            ],
+            "details": "2/2 expected route prefixes found"
+          },
+          "authSecurity": {
+            "score": 20,
+            "max": 20,
+            "passed": true,
+            "details": "2/2 mutating routes enforce authentication"
+          },
+          "relationshipIntegrity": {
+            "score": 15,
+            "max": 15,
+            "passed": true,
+            "details": "12 entity relationships / foreign keys linked"
+          },
+          "architectureCohesion": {
+            "score": 10,
+            "max": 10,
+            "passed": true,
+            "details": "Architecture topology matches domain requirements"
+          }
+        },
+        "findings": []
+      },
+      "exportVerification": {
+        "success": true,
+        "jsonSizeKB": "49.4",
+        "mdSizeKB": "19.1"
+      },
+      "versionComparison": {
+        "hasChanges": true,
+        "totalDiffs": 1,
+        "summary": "+1 endpoints"
+      }
+    },
+    {
+      "testId": "eval-ecommerce",
+      "domain": "E-Commerce",
+      "name": "ShopSphere Online Retail Marketplace",
+      "description": "E-commerce marketplace with product catalog, shopping cart, customer reviews, Stripe checkout, and inventory tracking.",
+      "type": "domain_generation",
+      "latencyMs": 6,
+      "executionStatus": "PASSED",
+      "errorMessage": null,
+      "structuralValidation": {
+        "passed": true,
+        "errorCount": 0,
+        "errors": []
+      },
+      "semanticEvaluation": {
+        "semanticScore": 82,
+        "domainRelevance": "Medium",
+        "criteria": {
+          "entityCoverage": {
+            "score": 20,
+            "max": 30,
+            "passed": false,
+            "matched": [
+              "Product",
+              "Order"
+            ],
+            "expected": [
+              "Product",
+              "Order",
+              "User"
+            ],
+            "details": "2/3 domain entities present"
+          },
+          "endpointCoverage": {
+            "score": 17,
+            "max": 25,
+            "passed": true,
+            "matched": [
+              "/api/v1/products",
+              "/api/v1/checkout"
+            ],
+            "expected": [
+              "/api/v1/products",
+              "/api/v1/cart",
+              "/api/v1/checkout"
+            ],
+            "details": "2/3 expected route prefixes found"
+          },
+          "authSecurity": {
+            "score": 20,
+            "max": 20,
+            "passed": true,
+            "details": "1/1 mutating routes enforce authentication"
+          },
+          "relationshipIntegrity": {
+            "score": 15,
+            "max": 15,
+            "passed": true,
+            "details": "3 entity relationships / foreign keys linked"
+          },
+          "architectureCohesion": {
+            "score": 10,
+            "max": 10,
+            "passed": true,
+            "details": "Architecture topology matches domain requirements"
+          }
+        },
+        "findings": [
+          "Semantic entity gap: Missing expected domain entities [User]",
+          "Route coverage recommendation: Consider adding endpoints for [/api/v1/cart]"
+        ]
+      },
+      "exportVerification": {
+        "success": true,
+        "jsonSizeKB": "33.1",
+        "mdSizeKB": "13.1"
+      },
+      "versionComparison": {
+        "hasChanges": true,
+        "totalDiffs": 1,
+        "summary": "+1 endpoints"
+      }
+    },
+    {
+      "testId": "eval-task-management",
+      "domain": "Task Management",
+      "name": "TaskFlow Agile Kanban Workspace",
+      "description": "Collaborative project and task management system with Kanban boards, sprint milestones, team assignments, and deadline notifications.",
+      "type": "domain_generation",
+      "latencyMs": 7,
+      "executionStatus": "PASSED",
+      "errorMessage": null,
+      "structuralValidation": {
+        "passed": true,
+        "errorCount": 0,
+        "errors": []
+      },
+      "semanticEvaluation": {
+        "semanticScore": 100,
+        "domainRelevance": "High",
+        "criteria": {
+          "entityCoverage": {
+            "score": 30,
+            "max": 30,
+            "passed": true,
+            "matched": [
+              "User",
+              "Project",
+              "Board",
+              "Task"
+            ],
+            "expected": [
+              "User",
+              "Project",
+              "Board",
+              "Task"
+            ],
+            "details": "4/4 domain entities present"
+          },
+          "endpointCoverage": {
+            "score": 25,
+            "max": 25,
+            "passed": true,
+            "matched": [
+              "/api/v1/projects",
+              "/api/v1/boards",
+              "/api/v1/tasks"
+            ],
+            "expected": [
+              "/api/v1/projects",
+              "/api/v1/boards",
+              "/api/v1/tasks"
+            ],
+            "details": "3/3 expected route prefixes found"
+          },
+          "authSecurity": {
+            "score": 20,
+            "max": 20,
+            "passed": true,
+            "details": "4/4 mutating routes enforce authentication"
+          },
+          "relationshipIntegrity": {
+            "score": 15,
+            "max": 15,
+            "passed": true,
+            "details": "12 entity relationships / foreign keys linked"
+          },
+          "architectureCohesion": {
+            "score": 10,
+            "max": 10,
+            "passed": true,
+            "details": "Architecture topology matches domain requirements"
+          }
+        },
+        "findings": []
+      },
+      "exportVerification": {
+        "success": true,
+        "jsonSizeKB": "45.3",
+        "mdSizeKB": "17.4"
+      },
+      "versionComparison": {
+        "hasChanges": true,
+        "totalDiffs": 1,
+        "summary": "+1 endpoints"
+      }
+    },
+    {
+      "testId": "eval-healthcare-booking",
+      "domain": "Booking & Healthcare",
+      "name": "CareMed Clinic Appointment Engine",
+      "description": "Healthcare patient portal and doctor appointment booking system with calendar slots, medical history records, and digital prescriptions.",
+      "type": "domain_generation",
+      "latencyMs": 5,
+      "executionStatus": "PASSED",
+      "errorMessage": null,
+      "structuralValidation": {
+        "passed": true,
+        "errorCount": 0,
+        "errors": []
+      },
+      "semanticEvaluation": {
+        "semanticScore": 90,
+        "domainRelevance": "High",
+        "criteria": {
+          "entityCoverage": {
+            "score": 20,
+            "max": 30,
+            "passed": false,
+            "matched": [
+              "Doctor",
+              "Appointment"
+            ],
+            "expected": [
+              "Doctor",
+              "Patient",
+              "Appointment"
+            ],
+            "details": "2/3 domain entities present"
+          },
+          "endpointCoverage": {
+            "score": 25,
+            "max": 25,
+            "passed": true,
+            "matched": [
+              "/api/v1/doctors",
+              "/api/v1/appointments"
+            ],
+            "expected": [
+              "/api/v1/doctors",
+              "/api/v1/appointments"
+            ],
+            "details": "2/2 expected route prefixes found"
+          },
+          "authSecurity": {
+            "score": 20,
+            "max": 20,
+            "passed": true,
+            "details": "2/2 mutating routes enforce authentication"
+          },
+          "relationshipIntegrity": {
+            "score": 15,
+            "max": 15,
+            "passed": true,
+            "details": "13 entity relationships / foreign keys linked"
+          },
+          "architectureCohesion": {
+            "score": 10,
+            "max": 10,
+            "passed": true,
+            "details": "Architecture topology matches domain requirements"
+          }
+        },
+        "findings": [
+          "Semantic entity gap: Missing expected domain entities [Patient]"
+        ]
+      },
+      "exportVerification": {
+        "success": true,
+        "jsonSizeKB": "50.6",
+        "mdSizeKB": "19.4"
+      },
+      "versionComparison": {
+        "hasChanges": true,
+        "totalDiffs": 1,
+        "summary": "+1 endpoints"
+      }
+    },
+    {
+      "testId": "eval-invalid-input",
+      "domain": "Edge Case: Input Validation",
+      "name": "Edge Case: Input Validation",
+      "description": "",
+      "type": "input_validation",
+      "latencyMs": 1,
+      "executionStatus": "PASSED",
+      "errorMessage": "Successfully caught empty input and enforced validation rejection.",
+      "structuralValidation": {
+        "passed": true,
+        "errorCount": 0,
+        "errors": []
+      },
+      "semanticEvaluation": null,
+      "exportVerification": {
+        "success": false,
+        "error": null
+      },
+      "versionComparison": null
+    },
+    {
+      "testId": "eval-malformed-json",
+      "domain": "Edge Case: Malformed AI Output",
+      "name": "Broken JSON Test System",
+      "description": "Simulates Gemini AI returning unclosed JSON fences or truncated syntax.",
+      "type": "malformed_json_resilience",
+      "latencyMs": 6,
+      "executionStatus": "PASSED",
+      "errorMessage": "Simulated malformed JSON was successfully intercepted; system recovered via fallback generator.",
+      "structuralValidation": {
+        "passed": true,
+        "errorCount": 0,
+        "errors": []
+      },
+      "semanticEvaluation": null,
+      "exportVerification": {
+        "success": false,
+        "error": null
+      },
+      "versionComparison": null
+    },
+    {
+      "testId": "eval-api-rate-limit",
+      "domain": "Edge Case: API Rate Limit",
+      "name": "Rate Limited Application",
+      "description": "Simulates upstream Gemini 429 RESOURCE_EXHAUSTED rate limit error.",
+      "type": "rate_limit_resilience",
+      "latencyMs": 3,
+      "executionStatus": "PASSED",
+      "errorMessage": "Upstream 429 status simulated; fallback blueprint invoked seamlessly without crashing.",
+      "structuralValidation": {
+        "passed": true,
+        "errorCount": 0,
+        "errors": []
+      },
+      "semanticEvaluation": null,
+      "exportVerification": {
+        "success": false,
+        "error": null
+      },
+      "versionComparison": null
+    },
+    {
+      "testId": "eval-api-timeout",
+      "domain": "Edge Case: API Timeout",
+      "name": "Network Timeout System",
+      "description": "Simulates network socket delay exceeding response threshold.",
+      "type": "timeout_resilience",
+      "latencyMs": 1,
+      "executionStatus": "PASSED",
+      "errorMessage": "Simulated network timeout handled gracefully with fallback blueprint.",
+      "structuralValidation": {
+        "passed": true,
+        "errorCount": 0,
+        "errors": []
+      },
+      "semanticEvaluation": null,
+      "exportVerification": {
+        "success": false,
+        "error": null
+      },
+      "versionComparison": null
+    }
+  ]
+}

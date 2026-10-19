@@ -1,30 +1,21 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  validateArchitectureBlueprint,
+  deriveModulesFromBlueprint,
+  generateArchitectureMarkdown
+} from '../validators/architectureSchema.js';
+
+export { generateArchitectureMarkdown, validateArchitectureBlueprint };
 
 /**
- * Validates that an AI output object conforms to the technical blueprint schema.
+ * Validates that an AI output object conforms to the technical blueprint schema using Zod.
  */
 export const validateBlueprintSchema = (data) => {
-  if (!data || typeof data !== 'object') return false;
-
-  const requiredFields = [
-    'overview',
-    'assumptions',
-    'functionalRequirements',
-    'nonFunctionalRequirements',
-    'userRoles',
-    'features',
-    'entities',
-    'relationships',
-    'missingRequirements'
-  ];
-
-  for (const field of requiredFields) {
-    if (!(field in data)) {
-      console.warn(`Validation Warning: Field '${field}' is missing in AI response.`);
-      return false;
-    }
+  const result = validateArchitectureBlueprint(data);
+  if (!result.success) {
+    console.warn('Zod Blueprint Validation Warnings:', result.errors);
+    return false;
   }
-
   return true;
 };
 
@@ -38,11 +29,13 @@ export const analyzeRequirements = async (project) => {
   console.log("BACKEND RECEIVED PROMPT:", project.description);
 
   if (apiKey && apiKey.trim()) {
-    try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: modelName });
+    const MAX_RETRIES = 2;
+    let attempt = 0;
 
-      const prompt = `
+    const genAI = new GoogleGenerativeAI(apiKey.trim());
+    const model = genAI.getGenerativeModel({ model: modelName });
+
+    const prompt = `
 You are a Senior Principal Software Architect and Lead Systems Engineer.
 Analyze the following project requirement and generate a production-grade, highly rigorous, developer-ready technical blueprint in STRICT VALID JSON format.
 
@@ -73,17 +66,36 @@ REQUIRED JSON SCHEMA (Substitute actual domain-specific values for this project)
   "techStack": [
     { "category": "Frontend", "technology": "React 18 / Vite / Tailwind CSS", "purpose": "UI Framework", "reason": "Virtual DOM reconciliation speed." }
   ],
+  "modules": [
+    {
+      "name": "Frontend Client Module",
+      "type": "frontend",
+      "description": "User UI views and state management.",
+      "responsibilities": ["Render responsive dashboard", "Handle JWT authentication state"],
+      "filePaths": ["frontend/src/App.jsx", "frontend/src/pages/Dashboard.jsx"]
+    },
+    {
+      "name": "Core Domain Service",
+      "type": "service",
+      "description": "Handles domain controllers and business logic.",
+      "responsibilities": ["Validate payloads", "Persist entities to MongoDB"],
+      "filePaths": ["backend/src/controllers/domainController.js", "backend/src/models/Domain.js"]
+    }
+  ],
   "architecture": {
     "summary": "3-tier architectural breakdown tailored to ${project.name}.",
     "pattern": "Express MVC REST API + React SPA",
     "dataFlow": "Client -> Nginx Proxy -> Express AuthMiddleware -> Controller -> Mongoose -> MongoDB",
     "nodes": [
-      { "id": "client", "label": "React SPA Client", "type": "user", "description": "Browser Interface" },
-      { "id": "backend", "label": "Express Server & Controllers", "type": "backend", "description": "Domain REST API" },
-      { "id": "database", "label": "MongoDB Database", "type": "database", "description": "Indexed Document Store" }
+      { "id": "client", "label": "React SPA Client", "type": "frontend", "description": "Browser Interface" },
+      { "id": "gateway", "label": "Express API Gateway", "type": "api", "description": "REST API Routing & Auth" },
+      { "id": "backend", "label": "Controllers & Services", "type": "service", "description": "Business Logic Execution" },
+      { "id": "database", "label": "MongoDB Database", "type": "database", "description": "Indexed Document Store" },
+      { "id": "external", "label": "External Services", "type": "external", "description": "Third-Party Provider" }
     ],
     "connections": [
-      { "from": "client", "to": "backend", "label": "HTTPS REST API" },
+      { "from": "client", "to": "gateway", "label": "HTTPS REST API" },
+      { "from": "gateway", "to": "backend", "label": "Controller Dispatch" },
       { "from": "backend", "to": "database", "label": "Mongoose ODM Queries" }
     ]
   },
@@ -122,6 +134,17 @@ REQUIRED JSON SCHEMA (Substitute actual domain-specific values for this project)
   },
   "folderStructure": { "frontend": "frontend/src/", "backend": "backend/src/" },
   "security": [{ "item": "Security Control", "recommendation": "Recommendation", "relevance": "Relevance" }],
+  "errorHandling": {
+    "strategy": "Centralized Express error middleware with typed HTTP responses.",
+    "httpCodes": [
+      { "code": 400, "scenario": "Malformed input or missing required fields", "responseFormat": "{ \"success\": false, \"message\": \"Validation error\" }" },
+      { "code": 401, "scenario": "Expired or missing JWT Bearer token", "responseFormat": "{ \"success\": false, \"message\": \"Unauthorized\" }" },
+      { "code": 404, "scenario": "Requested resource not found", "responseFormat": "{ \"success\": false, \"message\": \"Resource not found\" }" },
+      { "code": 500, "scenario": "Internal database or server error", "responseFormat": "{ \"success\": false, \"message\": \"Internal server error\" }" }
+    ],
+    "logging": "Structured server logs with timestamp and request ID.",
+    "retries": "Exponential backoff with max 3 attempts on transient database connection errors."
+  },
   "roadmapPhases": [
     {
       "phaseNumber": 1,
@@ -137,37 +160,65 @@ REQUIRED JSON SCHEMA (Substitute actual domain-specific values for this project)
     "platform": "Render / Vercel + MongoDB Atlas",
     "envVars": ["PORT", "MONGODB_URI"],
     "steps": ["Step 1"],
-    "dockerfileSnippet": "FROM node:18-alpine\\nCMD [\\"node\\", \\"src/server.js\\"]",
+    "dockerfileSnippet": "FROM node:18-alpine\\nCMD [\"node\", \"src/server.js\"]",
     "nginxSnippet": "server { listen 80; }"
   }
 }
 `;
 
-      console.log("AI PROMPT:", prompt);
+    while (attempt < MAX_RETRIES) {
+      attempt++;
+      try {
+        console.log(`[AI SERVICE] Calling Gemini (${modelName}) - Attempt ${attempt}/${MAX_RETRIES}`);
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
 
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-      console.log("AI RESPONSE:", responseText);
+        const cleanedJson = responseText
+          .replace(/```json/gi, '')
+          .replace(/```/g, '')
+          .trim();
 
-      const cleanedJson = responseText
-        .replace(/```json/gi, '')
-        .replace(/```/g, '')
-        .trim();
+        let parsedData;
+        try {
+          parsedData = JSON.parse(cleanedJson);
+        } catch (jsonErr) {
+          console.warn(`[AI SERVICE] JSON parse failure on attempt ${attempt}:`, jsonErr.message);
+          if (attempt < MAX_RETRIES) {
+            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+          break;
+        }
 
-      const parsedData = JSON.parse(cleanedJson);
-
-      if (validateBlueprintSchema(parsedData)) {
-        return parsedData;
+        const validation = validateArchitectureBlueprint(parsedData);
+        if (validation.success) {
+          console.log(`[AI SERVICE] Blueprint successfully validated by Zod on attempt ${attempt}`);
+          return validation.data;
+        } else {
+          console.warn(`[AI SERVICE] Zod validation failed on attempt ${attempt}:`, validation.errors);
+          if (attempt < MAX_RETRIES) {
+            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+        }
+      } catch (err) {
+        console.error(`[AI SERVICE] Error on attempt ${attempt}:`, err.message);
+        if (attempt < MAX_RETRIES) {
+          const delay = (err.status === 429 || err.message?.includes('429')) ? 2500 : 1000 * attempt;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
       }
-    } catch (err) {
-      console.error('Gemini AI Blueprint Generation Error:', err.message);
     }
   } else {
     console.log("AI PROMPT: [Gemini API Key missing or empty. Invoking Dynamic Domain Fallback Blueprint Generator]");
   }
 
-  return generateFallbackBlueprint(project);
+  const fallback = generateFallbackBlueprint(project);
+  const validatedFallback = validateArchitectureBlueprint(fallback);
+  return validatedFallback.success ? validatedFallback.data : fallback;
 };
+
 
 /**
  * Dynamic fallback generator producing domain-tailored technical blueprints based on user prompt.
@@ -201,9 +252,15 @@ const generateFallbackBlueprint = (project) => {
     return generateEducationBlueprint(name, desc, pType, pStack);
   }
 
-  // 5. Generic / Custom Domain Dynamic Generator
+  // 5. Task Management / Collaboration / Kanban Domain
+  if (descLower.includes('task') || descLower.includes('kanban') || descLower.includes('board') || descLower.includes('todo') || descLower.includes('sprint') || descLower.includes('project management') || descLower.includes('scrum') || descLower.includes('workflow')) {
+    return generateTaskManagementBlueprint(name, desc, pType, pStack);
+  }
+
+  // 6. Generic / Custom Domain Dynamic Generator
   return generateGenericDynamicBlueprint(name, desc, pType, pStack);
 };
+
 
 /* ==========================================================================
    DOMAIN SPECIFIC FALLBACK GENERATORS
@@ -689,7 +746,191 @@ function generateEducationBlueprint(name, desc, pType, pStack) {
   };
 }
 
+function generateTaskManagementBlueprint(name, desc, pType, pStack) {
+  return {
+    overview: `${name} is an enterprise-grade collaborative ${pType} designed for agile project tracking, Kanban workflows, sprint milestone planning, and automated team notifications.`,
+    problemStatement: `Eliminates communication silos, missed project deadlines, and fragmented task tracking by providing a centralized Kanban board and real-time sprint execution engine.`,
+    assumptions: [
+      `Users collaborate in real-time across workspaces, projects, and Kanban boards.`,
+      `Tasks transition through workflow states: Backlog, To Do, In Progress, Review, and Done.`,
+      `Team members receive instantaneous WebSocket updates when task assignments or columns change.`
+    ],
+    functionalRequirements: [
+      `User authentication, workspace invitations, and team role assignments (Admin, Member, Viewer).`,
+      `Kanban board creation with customizable swimlanes and drag-and-drop task card positioning.`,
+      `Granular task management with title, markdown description, assignees, due dates, priority tags, and checklists.`,
+      `Activity audit trail tracking task status transitions, comments, and file attachments.`
+    ],
+    nonFunctionalRequirements: [
+      `Sub-150ms real-time broadcast of card movement across all active board sessions using WebSockets.`,
+      `Role-Based Access Control ensuring private projects are accessible only to invited workspace members.`,
+      `High-efficiency MongoDB indexing on project workspace IDs and task status columns.`
+    ],
+    userRoles: [
+      { role: 'Workspace Admin', description: 'Creates projects, manages team billing, and configures board workflows.', permissions: ['manage_workspace', 'manage_projects', 'manage_members'] },
+      { role: 'Team Member', description: 'Creates tasks, moves cards across columns, adds comments, and logs progress.', permissions: ['create_tasks', 'edit_tasks', 'move_cards'] },
+      { role: 'Observer / Viewer', description: 'Read-only access to sprint boards and milestone progress reports.', permissions: ['view_board', 'view_reports'] }
+    ],
+    features: [
+      `Interactive Drag-and-Drop Kanban Boards & Sprint Slices`,
+      `Real-Time Team Collaboration & WebSocket Live Cursor/Card Sync`,
+      `Granular Task Checklists, Priority Badges, & Due Date Reminders`,
+      `Workspace Activity Audit Logs & Sprint Velocity Metrics`
+    ],
+    missingRequirements: [
+      `Integration with third-party code repositories (e.g. GitHub/GitLab PR linking) unspecified.`,
+      `SSO SAML / Okta enterprise identity provider configuration assumed optional.`
+    ],
+    techStack: [
+      { category: 'Frontend', technology: 'React 18, Tailwind CSS & dnd-kit', purpose: 'Kanban SPA Interface', reason: 'High-performance drag-and-drop rendering without layout thrashing.' },
+      { category: 'Backend Server', technology: 'Node.js & Express.js with Socket.io', purpose: 'REST API & Real-Time Sync', reason: 'Non-blocking I/O ideal for concurrent team card movements.' },
+      { category: 'Database', technology: 'MongoDB & Mongoose', purpose: 'Project & Task Document Store', reason: 'Flexible document hierarchy for nested task comments and checklists.' }
+    ],
+    modules: [
+      {
+        name: 'Workspace & Identity Module',
+        type: 'Security & Organization Service',
+        description: 'Manages user accounts, JWT sessions, workspace scoping, and membership invitations.',
+        responsibilities: ['User authentication', 'Workspace scoping', 'RBAC permission checks'],
+        filePaths: ['backend/src/controllers/authController.js', 'backend/src/models/Workspace.js', 'backend/src/middleware/authMiddleware.js']
+      },
+      {
+        name: 'Kanban Board & Task Engine',
+        type: 'Core Workflow Service',
+        description: 'Handles board swimlane configurations, task card CRUD, column transitions, and real-time WebSocket broadcasts.',
+        responsibilities: ['Create & update tasks', 'Card position reordering', 'Broadcast live changes'],
+        filePaths: ['backend/src/controllers/taskController.js', 'backend/src/models/Task.js', 'backend/src/routes/taskRoutes.js', 'backend/src/sockets/boardSocket.js']
+      },
+      {
+        name: 'Project Workspace Service',
+        type: 'Resource Management Service',
+        description: 'Organizes boards by project, manages sprint milestone deadlines, and aggregates velocity reports.',
+        responsibilities: ['Project organization', 'Sprint timeline calculation', 'Audit activity logging'],
+        filePaths: ['backend/src/controllers/projectController.js', 'backend/src/models/Project.js', 'backend/src/routes/projectRoutes.js']
+      }
+    ],
+    architecture: {
+      summary: 'Event-driven real-time Kanban architecture with Socket.io card synchronization and Express REST persistence.',
+      pattern: 'Modular Monolith with WebSocket Event Bus',
+      dataFlow: 'Client SPA (dnd-kit) -> REST / WSS -> Express API Gateway & Socket Handler -> Mongoose -> MongoDB Atlas',
+      nodes: [
+        { id: 'kanban-ui', label: 'React Kanban SPA', type: 'user', description: 'Interactive drag-and-drop board UI with optimistic updates' },
+        { id: 'api-server', label: 'Express API Server', type: 'backend', description: 'Handles task mutations, authentication, and workspace permissions' },
+        { id: 'socket-bus', label: 'Socket.io Event Bus', type: 'service', description: 'Broadcasts card movement events to active team board sessions' },
+        { id: 'db-mongo', label: 'MongoDB Database', type: 'database', description: 'Stores Workspaces, Projects, Boards, Tasks, and Audit Logs' }
+      ],
+      connections: [
+        { from: 'kanban-ui', to: 'api-server', label: 'HTTPS REST Mutations' },
+        { from: 'kanban-ui', to: 'socket-bus', label: 'WSS Real-Time Sync' },
+        { from: 'api-server', to: 'socket-bus', label: 'Dispatch Broadcast Event' },
+        { from: 'api-server', to: 'db-mongo', label: 'Mongoose ODM Queries' }
+      ]
+    },
+    entities: [
+      {
+        name: 'User',
+        description: 'Registered platform user with authentication credentials and workspace profile.',
+        primaryKey: '_id (ObjectId)',
+        foreignKeys: [],
+        relationships: ['Task (1:N)', 'Project (1:N)'],
+        fields: [
+          { name: '_id', type: 'ObjectId', required: true, description: 'Primary key' },
+          { name: 'name', type: 'String', required: true, description: 'User display name' },
+          { name: 'email', type: 'String', required: true, description: 'Unique user email' },
+          { name: 'role', type: 'String', required: true, description: 'Platform role (Admin, Member)' }
+        ]
+      },
+      {
+        name: 'Project',
+        description: 'Top-level workspace project grouping related boards and team members.',
+        primaryKey: '_id (ObjectId)',
+        foreignKeys: ['owner -> User._id'],
+        relationships: ['Board (1:N)', 'User (N:1)'],
+        fields: [
+          { name: '_id', type: 'ObjectId', required: true, description: 'Primary key' },
+          { name: 'name', type: 'String', required: true, description: 'Project title' },
+          { name: 'owner', type: 'ObjectId', required: true, description: 'FK to User._id' },
+          { name: 'description', type: 'String', required: false, description: 'Project overview' }
+        ]
+      },
+      {
+        name: 'Board',
+        description: 'Kanban board containing configured workflow columns (e.g. To Do, In Progress, Done).',
+        primaryKey: '_id (ObjectId)',
+        foreignKeys: ['project -> Project._id'],
+        relationships: ['Task (1:N)', 'Project (N:1)'],
+        fields: [
+          { name: '_id', type: 'ObjectId', required: true, description: 'Primary key' },
+          { name: 'project', type: 'ObjectId', required: true, description: 'FK to Project._id' },
+          { name: 'title', type: 'String', required: true, description: 'Board name' },
+          { name: 'columns', type: 'Array', required: true, description: 'List of column titles and order indices' }
+        ]
+      },
+      {
+        name: 'Task',
+        description: 'Actionable work item card on a Kanban board.',
+        primaryKey: '_id (ObjectId)',
+        foreignKeys: ['board -> Board._id', 'assignee -> User._id'],
+        relationships: ['Board (N:1)', 'User (N:1)'],
+        fields: [
+          { name: '_id', type: 'ObjectId', required: true, description: 'Primary key' },
+          { name: 'board', type: 'ObjectId', required: true, description: 'FK to Board._id' },
+          { name: 'title', type: 'String', required: true, description: 'Task title' },
+          { name: 'description', type: 'String', required: false, description: 'Markdown task details' },
+          { name: 'status', type: 'String', required: true, description: 'Current column status (To Do, In Progress, Done)' },
+          { name: 'priority', type: 'String', required: true, description: 'Priority level (Low, Medium, High, Urgent)' },
+          { name: 'assignee', type: 'ObjectId', required: false, description: 'FK to assigned User._id' },
+          { name: 'dueDate', type: 'Date', required: false, description: 'Optional milestone deadline' }
+        ]
+      }
+    ],
+    relationships: [
+      { from: 'Project', to: 'Board', type: '1:N', description: 'Project contains multiple Kanban boards' },
+      { from: 'Board', to: 'Task', type: '1:N', description: 'Board contains task cards organized by column' }
+    ],
+    erDiagramText: `erDiagram\n    PROJECT ||--o{ BOARD : contains\n    BOARD ||--o{ TASK : organizes\n    USER ||--o{ TASK : assigned_to`,
+    apiEndpoints: [
+      { method: 'GET', endpoint: '/api/v1/projects', description: 'Retrieve user projects.', authentication: 'Required (JWT)', headers: 'Authorization: Bearer <token>', queryParams: 'None', requestBody: 'None', response: '[]', possibleErrors: ['401 Unauthorized'] },
+      { method: 'POST', endpoint: '/api/v1/projects', description: 'Create a new project workspace.', authentication: 'Required (JWT)', headers: 'Authorization: Bearer <token>', queryParams: 'None', requestBody: '{"name":"Sprint Alpha"}', response: '{"_id":"...","name":"Sprint Alpha"}', possibleErrors: ['400 Bad Request'] },
+      { method: 'GET', endpoint: '/api/v1/boards/:id', description: 'Get board swimlanes and task cards.', authentication: 'Required (JWT)', headers: 'Authorization: Bearer <token>', queryParams: 'None', requestBody: 'None', response: '{"_id":"...","tasks":[]}', possibleErrors: ['404 Not Found'] },
+      { method: 'POST', endpoint: '/api/v1/boards/:boardId/tasks', description: 'Create a new task card on a board.', authentication: 'Required (JWT)', headers: 'Authorization: Bearer <token>', queryParams: 'None', requestBody: '{"title":"Fix Bug","status":"To Do"}', response: '{"_id":"...","title":"Fix Bug"}', possibleErrors: ['400 Bad Request'] },
+      { method: 'PUT', endpoint: '/api/v1/tasks/:id/status', description: 'Update task column status and order index.', authentication: 'Required (JWT)', headers: 'Authorization: Bearer <token>', queryParams: 'None', requestBody: '{"status":"Done","orderIndex":2}', response: '{"_id":"...","status":"Done"}', possibleErrors: ['404 Not Found'] },
+      { method: 'DELETE', endpoint: '/api/v1/tasks/:id', description: 'Archive or permanently delete a task card.', authentication: 'Required (JWT)', headers: 'Authorization: Bearer <token>', queryParams: 'None', requestBody: 'None', response: '{"success":true}', possibleErrors: ['403 Forbidden'] }
+    ],
+    frontend: {
+      pages: [
+        { name: 'Kanban Board View', route: '/boards/:id', purpose: 'Interactive drag-and-drop task board with real-time sync.', components: ['KanbanColumn', 'TaskCard', 'TaskModal'], apiCalls: ['GET /api/v1/boards/:id', 'PUT /api/v1/tasks/:id/status'] },
+        { name: 'Project Workspace Hub', route: '/projects', purpose: 'Overview of user projects, recent activity, and sprint timelines.', components: ['ProjectGrid', 'CreateProjectModal'], apiCalls: ['GET /api/v1/projects'] }
+      ],
+      componentStructure: [
+        { name: 'KanbanColumn', type: 'Drop Container', purpose: 'Renders tasks grouped by workflow state with drop target handling.' },
+        { name: 'TaskCard', type: 'Draggable Item', purpose: 'Displays task title, priority badge, assignee avatar, and due date indicator.' }
+      ]
+    },
+    folderStructure: {
+      frontend: `frontend/src/\n├── components/\n│   ├── kanban/      # KanbanBoard, KanbanColumn, TaskCard\n│   └── modals/      # TaskDetailModal, ProjectModal\n├── pages/           # BoardView, ProjectDashboard\n└── services/        # taskApi, socketClient`,
+      backend: `backend/src/\n├── controllers/     # projectController, boardController, taskController\n├── models/          # Project, Board, Task, User\n├── routes/          # projectRoutes, boardRoutes, taskRoutes\n└── sockets/         # boardSocketHandler.js`
+    },
+    security: [
+      { item: 'Stateless JWT Session Verification', recommendation: 'Authenticate all board read and write actions with Bearer JWT tokens.', relevance: 'Guarantees task data privacy.' },
+      { item: 'Workspace Scoping Middleware', recommendation: 'Verify requesting user is an active workspace member before returning board data.', relevance: 'Prevents multi-tenant data leakage.' }
+    ],
+    roadmapPhases: buildStandardRoadmapPhases(name, 'Task Management System', 'Task & Board API Engine', 'Kanban Board Drag-and-Drop SPA'),
+    testing: [
+      { type: 'Integration Testing', tool: 'Supertest', strategy: 'Test task state transitions, board permissions, and card reordering.' }
+    ],
+    deployment: {
+      platform: 'Render / Vercel + MongoDB Atlas',
+      envVars: ['PORT', 'MONGODB_URI', 'JWT_SECRET'],
+      steps: ['Deploy Express API with Socket.io on Render.', 'Deploy React Kanban SPA on Vercel.', 'Configure MongoDB Atlas indexes.'],
+      dockerfileSnippet: 'FROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nEXPOSE 5000\nCMD ["node", "src/server.js"]',
+      nginxSnippet: 'server {\n  listen 80;\n  location / {\n    proxy_pass http://localhost:5000;\n  }\n}'
+    }
+  };
+}
+
 function generateGenericDynamicBlueprint(name, desc, pType, pStack) {
+
   // Extract key words from description
   const words = desc.replace(/[^\w\s]/gi, '').split(/\s+/).filter(w => w.length > 3 && !['built', 'want', 'build', 'system', 'application', 'where', 'users', 'should', 'their', 'with', 'from', 'that', 'this', 'have', 'need'].includes(w.toLowerCase()));
   const entityA = words[0] ? capitalize(words[0]) : 'Item';

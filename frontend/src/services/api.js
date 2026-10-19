@@ -1,16 +1,18 @@
 import axios from 'axios';
 
 const API = axios.create({
-  // Ensure HTTPS is explicitly declared to avoid 308 redirects
-  baseURL: import.meta.env.VITE_API_URL || 'https://vision-2-system.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 });
 
+// Interceptor to attach JWT auth token from localStorage
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 export default API;

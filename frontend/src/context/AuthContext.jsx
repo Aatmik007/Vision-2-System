@@ -1,12 +1,51 @@
-const login = async (email, password) => {
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import API from '../services/api';
+
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (token) {
+        try {
+          const res = await API.get('/users/me');
+          const userData = res.data?.user || res.data;
+          setUser(userData);
+        } catch (err) {
+          console.error('Session validation error:', err);
+          logout();
+        }
+      }
+      setLoading(false);
+    };
+
+    fetchUser();
+  }, [token]);
+
+  const saveAuthSession = (data) => {
+    const sessionToken = data?.token;
+    const userData = data?.user || data;
+    if (sessionToken) {
+      localStorage.setItem('token', sessionToken);
+      setToken(sessionToken);
+    }
+    setUser(userData);
+    setError(null);
+  };
+
+  const login = async (email, password) => {
     setError(null);
     try {
-      // Must be /users/login instead of /auth/login or /login
       const res = await API.post('/users/login', { email, password });
       saveAuthSession(res.data);
       return res.data;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Login failed.';
+      const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
       setError(msg);
       throw new Error(msg);
     }
@@ -15,7 +54,6 @@ const login = async (email, password) => {
   const register = async (name, email, password) => {
     setError(null);
     try {
-      // Must be /users/register
       const res = await API.post('/users/register', { name, email, password });
       saveAuthSession(res.data);
       return res.data;
@@ -29,7 +67,6 @@ const login = async (email, password) => {
   const googleLogin = async (googlePayload) => {
     setError(null);
     try {
-      // Must be /users/google
       const res = await API.post('/users/google', googlePayload);
       saveAuthSession(res.data);
       return res.data;
@@ -39,3 +76,30 @@ const login = async (email, password) => {
       throw new Error(msg);
     }
   };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
+    setError(null);
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        error,
+        register,
+        login,
+        googleLogin,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
